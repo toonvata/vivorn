@@ -1,19 +1,19 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import List, Dict
-import json
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-
+import os
 
 app = FastAPI()
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Serve static files
+if os.path.exists("static"):
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+else:
+    print("Warning: 'static' directory not found")
 
-@app.get("/favicon.ico")
-async def favicon():
-    return FileResponse('static/favicon.ico')
+@app.get("/")
+async def read_index():
+    return FileResponse('index.html')
     
 class ThaiElementAssessment:
     def __init__(self):
