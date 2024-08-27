@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from typing import Dict, List  # เพิ่มบรรทัดนี้
+import json
 import os
 
 app = FastAPI()
@@ -15,10 +17,6 @@ if os.path.exists("static") and os.path.isdir("static"):
 else:
     print("Warning: 'static' directory not found. Static files will not be served.")
 
-@app.get("/")
-async def read_index():
-    return FileResponse('index.html')
-    
 class ThaiElementAssessment:
     def __init__(self):
         # Load questions and clinical symptoms from JSON files
@@ -81,6 +79,10 @@ class AssessmentInput(BaseModel):
     answers: Dict[str, int]
     symptoms: List[str]
 
+@app.get("/")
+async def read_index():
+    return FileResponse('index.html')
+    
 @app.post("/assess")
 async def assess(input_data: AssessmentInput):
     assessment = ThaiElementAssessment()
