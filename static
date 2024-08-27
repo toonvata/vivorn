@@ -34,6 +34,10 @@ function displayQuestions() {
     }
 }
 
+if not os.path.exists("static"):
+    os.makedirs("static")
+    print("Created 'static' directory")
+
 function displayClinicalSymptoms(dominantElement) {
     const container = document.getElementById('symptoms-list');
     container.innerHTML = '';
