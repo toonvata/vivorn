@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from typing import Dict, List  # เพิ่มบรรทัดนี้
+from pydantic import BaseModel
+from typing import Dict, List
 import json
 import os
 
@@ -10,12 +11,17 @@ app = FastAPI()
 print("Current working directory:", os.getcwd())
 print("Files in current directory:", os.listdir())
 
+# Create 'static' directory if it doesn't exist
+if not os.path.exists("static"):
+    os.makedirs("static")
+    print("Created 'static' directory")
+
 # Check if 'static' directory exists before mounting
 if os.path.exists("static") and os.path.isdir("static"):
     print("Static directory found. Mounting...")
     app.mount("/static", StaticFiles(directory="static"), name="static")
 else:
-    print("Warning: 'static' directory not found. Static files will not be served.")
+    print("Warning: Unable to create or find 'static' directory. Static files will not be served.")
 
 class ThaiElementAssessment:
     def __init__(self):
@@ -102,6 +108,7 @@ async def get_clinical_symptoms():
     with open('clinical_symptoms.json', 'r', encoding='utf-8') as f:
         clinical_symptoms = json.load(f)
     return clinical_symptoms
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
