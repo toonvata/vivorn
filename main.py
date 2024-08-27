@@ -1,35 +1,69 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, List
 import json
 import os
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-print("Current working directory:", os.getcwd())
-print("Files in current directory:", os.listdir())
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, replace with specific origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Print current working directory and files
+logger.info(f"Current working directory: {os.getcwd()}")
+logger.info(f"Files in current directory: {os.listdir()}")
 
 # Create 'static' directory if it doesn't exist
 if not os.path.exists("static"):
     os.makedirs("static")
-    print("Created 'static' directory")
+    logger.info("Created 'static' directory")
 
 # Check if 'static' directory exists before mounting
 if os.path.exists("static") and os.path.isdir("static"):
-    print("Static directory found. Mounting...")
+    logger.info("Static directory found. Mounting...")
     app.mount("/static", StaticFiles(directory="static"), name="static")
 else:
-    print("Warning: Unable to create or find 'static' directory. Static files will not be served.")
+    logger.warning("Unable to create or find 'static' directory. Static files will not be served.")
 
 class ThaiElementAssessment:
     def __init__(self):
         # Load questions and clinical symptoms from JSON files
-        with open('questions.json', 'r', encoding='utf-8') as f:
-            self.questions = json.load(f)
-        with open('clinical_symptoms.json', 'r', encoding='utf-8') as f:
-            self.clinical_symptoms = json.load(f)
+        try:
+            with open('questions.json', 'r', encoding='utf-8') as f:
+                self.questions = json.load(f)
+            logger.info("Successfully loaded questions.json")
+        except FileNotFoundError:
+            logger.error("questions.json file not found")
+            raise HTTPException(status_code=500, detail="questions.json file not found")
+        except json.JSONDecodeError as e:
+            logger.error(f"Error decoding questions.json: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error decoding questions.json")
+
+        try:
+            with open('clinical_symptoms.json', 'r', encoding='utf-8') as f:
+                self.clinical_symptoms = json.load(f)
+            logger.info("Successfully loaded clinical_symptoms.json")
+        except FileNotFoundError:
+            logger.error("clinical_symptoms.json file not found")
+            raise HTTPException(status_code=500, detail="clinical_symptoms.json file not found")
+        except json.JSONDecodeError as e:
+            logger.error(f"Error decoding clinical_symptoms.json: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error decoding clinical_symptoms.json")
+
         self.scores = {"ปิตตะ": 0, "วาตะ": 0, "เสมหะ": 0}
         self.user_symptoms = []
 
@@ -91,23 +125,44 @@ async def read_index():
     
 @app.post("/assess")
 async def assess(input_data: AssessmentInput):
-    assessment = ThaiElementAssessment()
-    assessment.process_answers(input_data.answers)
-    assessment.process_symptoms(input_data.symptoms)
-    results = assessment.get_results()
-    return results
+    try:
+        assessment = ThaiElementAssessment()
+        assessment.process_answers(input_data.answers)
+        assessment.process_symptoms(input_data.symptoms)
+        results = assessment.get_results()
+        logger.info(f"Assessment completed. Results: {results}")
+        return results
+    except Exception as e:
+        logger.error(f"Error during assessment: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"An error occurred during assessment: {str(e)}")
 
 @app.get("/questions")
 async def get_questions():
-    with open('questions.json', 'r', encoding='utf-8') as f:
-        questions = json.load(f)
-    return questions
+    try:
+        with open('questions.json', 'r', encoding='utf-8') as f:
+            questions = json.load(f)
+        logger.info("Successfully served questions.json")
+        return questions
+    except FileNotFoundError:
+        logger.error("questions.json file not found")
+        raise HTTPException(status_code=404, detail="questions.json file not found")
+    except json.JSONDecodeError as e:
+        logger.error(f"Error decoding questions.json: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error decoding questions.json")
 
 @app.get("/clinical_symptoms")
 async def get_clinical_symptoms():
-    with open('clinical_symptoms.json', 'r', encoding='utf-8') as f:
-        clinical_symptoms = json.load(f)
-    return clinical_symptoms
+    try:
+        with open('clinical_symptoms.json', 'r', encoding='utf-8') as f:
+            clinical_symptoms = json.load(f)
+        logger.info("Successfully served clinical_symptoms.json")
+        return clinical_symptoms
+    except FileNotFoundError:
+        logger.error("clinical_symptoms.json file not found")
+        raise HTTPException(status_code=404, detail="clinical_symptoms.json file not found")
+    except json.JSONDecodeError as e:
+        logger.error(f"Error decoding clinical_symptoms.json: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error decoding clinical_symptoms.json")
 
 if __name__ == "__main__":
     import uvicorn
