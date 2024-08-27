@@ -1,0 +1,93 @@
+let questions = {};
+let clinicalSymptoms = {};
+let answers = {};
+let selectedSymptoms = [];
+
+async function fetchQuestions() {
+    const response = await fetch('/api/questions');
+    questions = await response.json();
+    displayQuestions();
+}
+
+async function fetchClinicalSymptoms() {
+    const response = await fetch('/api/clinical_symptoms');
+    clinicalSymptoms = await response.json();
+}
+
+function displayQuestions() {
+    const container = document.getElementById('questions-container');
+    for (const [category, options] of Object.entries(questions)) {
+        const categoryDiv = document.createElement('div');
+        categoryDiv.className = 'question';
+        categoryDiv.innerHTML = `
+            <h2>${category}</h2>
+            <div class="options">
+                ${Object.entries(options).map(([element, description], index) => `
+                    <label>
+                        <input type="radio" name="${category}" value="${index + 1}">
+                        ${description}
+                    </label>
+                `).join('')}
+            </div>
+        `;
+        container.appendChild(categoryDiv);
+    }
+}
+
+function displayClinicalSymptoms(dominantElement) {
+    const container = document.getElementById('symptoms-list');
+    container.innerHTML = '';
+    clinicalSymptoms[dominantElement].forEach((symptom, index) => {
+        const div = document.createElement('div');
+        div.innerHTML = `
+            <label>
+                <input type="checkbox" value="${symptom}">
+                ${symptom}
+            </label>
+        `;
+        container.appendChild(div);
+    });
+    document.getElementById('symptoms-container').style.display = 'block';
+}
+
+async function submitAssessment() {
+    // Collect answers
+    document.querySelectorAll('input[type="radio"]:checked').forEach(radio => {
+        answers[radio.name] = parseInt(radio.value);
+    });
+
+    // Collect selected symptoms
+    selectedSymptoms = Array.from(document.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+
+    const response = await fetch('/api/assess', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            answers: answers,
+            symptoms: selectedSymptoms
+        }),
+    });
+
+    const results = await response.json();
+    displayResults(results);
+}
+
+function displayResults(results) {
+    const container = document.getElementById('results');
+    container.innerHTML = `
+        <h2>ผลการประเมิน</h2>
+        <p>ธาตุเด่นของคุณคือ: ${results.dominant_element}</p>
+        <p>ค่าความเชื่อมโยง: ${results.correlation.toFixed(2)}</p>
+        <p>ระดับความเสี่ยง: ${results.risk_level}</p>
+        <p>คำอธิบาย: ${results.explanation}</p>
+    `;
+    container.style.display = 'block';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    fetchQuestions();
+    fetchClinicalSymptoms();
+    document.getElementById('submit-btn').addEventListener('click', submitAssessment);
+});
