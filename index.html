@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>แบบประเมินธาตุเด่นตามหลักการแพทย์แผนไทย</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-3xl mx-auto bg-white p-8 rounded shadow">
+        <h1 class="text-2xl font-bold mb-4">แบบประเมินธาตุเด่นตามหลักการแพทย์แผนไทยจากคัมภีร์ธาตุวิวรรณ์</h1>
+        <div id="questions-container"></div>
+        <div id="symptoms-container" class="mt-8 hidden">
+            <h2 class="text-xl font-semibold mb-2">อาการทางคลินิก</h2>
+            <div id="symptoms-list"></div>
+        </div>
+        <button id="submit-btn" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded">ส่งแบบประเมิน</button>
+        <div id="results-container" class="mt-8 hidden"></div>
+    </div>
+
+    <script>
+        let questions = {};
+        let clinicalSymptoms = {};
+        let answers = {};
+        let selectedSymptoms = [];
+
+        async function fetchQuestions() {
+            const response = await fetch('/api/questions');
+            questions = await response.json();
+            displayQuestions();
+        }
+
+        async function fetchClinicalSymptoms() {
+            const response = await fetch('/api/clinical_symptoms');
+            clinicalSymptoms = await response.json();
+        }
+
+        function displayQuestions() {
+            const container = document.getElementById('questions-container');
+            for (const [category, options] of Object.entries(questions)) {
+                const categoryDiv = document.createElement('div');
+                categoryDiv.className = 'mb-4';
+                categoryDiv.innerHTML = `
+                    <h2 class="text-lg font-semibold mb-2">${category}</h2>
+                    ${Object.entries(options).map(([element, description], index) => `
+                        <div class="mb-2">
+                            <input type="radio" id="${category}-${index}" name="${category}" value="${index + 1}">
+                            <label for="${category}-${index}">${description}</label>
+                        </div>
+                    `).join('')}
+                `;
+                container.appendChild(categoryDiv);
+            }
+        }
+
+        function displayClinicalSymptoms(dominantElement) {
+            const container = document.getElementById('symptoms-list');
+            container.innerHTML = '';
+            clinicalSymptoms[dominantElement].forEach((symptom, index) => {
+                const div = document.createElement('div');
+                div.className = 'mb-2';
+                div.innerHTML = `
+                    <input type="checkbox" id="symptom-${index}" value="${symptom}">
+                    <label for="symptom-${index}">${symptom}</label>
+                `;
+                container.appendChild(div);
+            });
+            document.getElementById('symptoms-container').classList.remove('hidden');
+        }
+
+        async function submitAssessment() {
+            // Collect answers
+            document.querySelectorAll('input[type="radio"]:checked').forEach(radio => {
+                answers[radio.name] = parseInt(radio.value);
+            });
+
+            // Collect selected symptoms
+            selectedSymptoms = Array.from(document.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+
+            const response = await fetch('/api/assess', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    answers: answers,
+                    symptoms: selectedSymptoms
+                }),
+            });
+
+            const results = await response.json();
+            displayResults(results);
+        }
+
+        function displayResults(results) {
+            const container = document.getElementById('results-container');
+            container.innerHTML = `
+                <h2 class="text-xl font-semibold mb-2">ผลการประเมิน</h2>
+                <p>ธาตุเด่นของคุณคือ: ${results.dominant_element}</p>
+                <p>ค่าความเชื่อมโยง: ${results.correlation.toFixed(2)}</p>
+                <p>ระดับความเสี่ยง: ${results.risk_level}</p>
+                <p>คำอธิบาย: ${results.explanation}</p>
+            `;
+            container.classList.remove('hidden');
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchQuestions();
+            fetchClinicalSymptoms();
+            document.getElementById('submit-btn').addEventListener('click', submitAssessment);
+        });
+    </script>
+</body>
+</html>
